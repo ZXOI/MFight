@@ -1,0 +1,1099 @@
+<div id=main>
+	<canvas id="board" width="1500px", height="800px"></canvas>
+</div>
+
+<script type="text/javascript">
+
+var colors = {
+	FIREBAR:["#00FF00","#6EFF00","#FFFF00","#FFAC00","#FF0000"],
+	PLAYERA:"#F93672",
+	PLAYERB:"#66D9EF",
+	GOODEFFECTSBAR:"#66D9EF55",
+	BADEFFECTSBAR:"#F9367255",
+	GOODEFFECTS:"#66D9EF",
+	BADEFFECTS:"#F93672",
+	NORMALBULLET:"#E6DB74",
+	LOCKDOWN:"#AE81FF",
+	SUPPRESSION:"#FF0000",
+	ACID:"#A6E22E",
+	HEAL:"#00FF00",
+	BACKGROUND:"#272822",
+	ENERGY_SHIELD:"#819AFF",
+	LAND:"#F8F8F2",
+	WEAPON_PACK:"#FD971F",
+	SIGHT_LINE:"#F8F8F2",
+	HPBAR:"#52C41A",
+	HPBAR_RB:"#72E43A",
+	HPBAR_LIMIT:"#666761",
+	BARBACKGROUND:"#464741"
+};
+
+var effects = {
+	colors:["#FFFFFF",colors.LOCKDOWN,colors.SUPPRESSION,colors.ACID,colors.HEAL,"#FFFFFF","#FFFFFF"],
+	names:["None","Lockdown","Suppression","Acid","Heal","Lockdown resistance","Suppression resistance"],
+	opposite:[-1,5,6,-1,-1,-1,-1],
+	have_times:[0,400,600,300,251,400,700],
+	been_times:[0,200,400,100,0,0,0],
+	NONE:0,
+	LOCKDOWN:1,
+	SUPPRESSION:2,
+	ACID:3,
+	HEAL:4,
+	LOCKDOWN_RESISTANCE:5,
+	SUPPRESSION_RESISTANCE:6
+};
+
+var weapons = {
+	firebreak:[8,4,180,150],
+	maxdis:[2500,2500,2500,300],
+	damage:[10,5,30,10],
+	bullet:[20,60,5,3],
+	speed:[3,2,15,8],
+	len:[15,8,30,20],
+	repel:[10,6,25,0],
+	sightline_opaque:["00","00","77","00"],
+	name:["G","M","S","H"],
+	reload_time:[300,500,400,400],
+	bulletspertime:[1,1,1,130],
+	spread:[20,30,0,350],
+	bullet_drop:[4,4,1,0],
+	GUN:0,
+	MINIGUN:1,
+	SNIPER:2,
+	SHOTGUN:3
+};
+
+var ph = 20, pw = 5;
+var kh = 10, kw = 10;
+var w = 1500, h = 800;
+var common_spd = .4;
+var pbw = 100,pbh = 3;
+var hpbw = 500 ,hpbh= 20;
+var eshieldlength = 20;
+max = Math.max;
+min = Math.min;
+
+var cvs;
+var playerA = new Player();
+var playerB = new Player();
+var lands = new Array();
+var effectpacks= new Array();
+var weaponpacks= new Array();
+var shieldpacks= new Array();
+var clock = 0;
+
+function dist(ax, ay, bx, by) {
+	// let dft = {
+	// 	x: 0, y: 0,
+	// };
+	// complete_with_default(a, dft);
+	// complete_with_default(b, dft);
+	let xd=ax-bx;
+	let yd=ay-by;
+	return Math.sqrt(xd*xd+yd*yd);
+}
+
+function complete_with_default(a, v) {
+	for (let i in v) {
+		if (a[i] === undefined || a[i] === null) {
+			a[i] = v[i];
+		}
+	}
+	return a;
+}
+
+function common_check_crash(a, b) {
+	let dft = {
+		xl: 0, yl: 0,
+		xa: 0, ya: 0,
+	};
+	complete_with_default(a, dft);
+	complete_with_default(b, dft);
+
+	let minAx = min(a.x, a.x + a.xl, a.x + a.xa, a.x + a.xl + a.xa);
+	let minBx = min(b.x, b.x + b.xl, b.x + b.xa, b.x + b.xl + b.xa);
+	let minAy = min(a.y, a.y + a.yl, a.y + a.ya, a.y + a.yl + a.ya);
+	let minBy = min(b.y, b.y + b.yl, b.y + b.ya, b.y + b.yl + b.ya);
+
+	let maxAx = max(a.x, a.x + a.xl, a.x + a.xa, a.x + a.xl + a.xa);
+	let maxBx = max(b.x, b.x + b.xl, b.x + b.xa, b.x + b.xl + b.xa);
+	let maxAy = max(a.y, a.y + a.yl, a.y + a.ya, a.y + a.yl + a.ya);
+	let maxBy = max(b.y, b.y + b.yl, b.y + b.ya, b.y + b.yl + b.ya);
+
+	if (minAx <= maxBx && maxAx >= minBx && minAy <= maxBy && maxAy >= minBy) { return true; }
+	return false;
+}
+
+function get_random(min, max) {
+	min = Math.ceil(min);
+	max = Math.floor(max);
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function Effect(type, time) {
+	this.type=type;
+	this.time=time;
+	this.atime=time;
+	this.dtime = () => {
+		// console.log("An effect have time "+this.time);
+		if (this.time >= 0) {
+			this.time -= 1;
+		}
+	};
+}
+
+function Position(x, y) {
+	this.x = x;
+	this.y = y;
+}
+
+function Line(a, b) {
+	this.s = a;
+	this.t = b;
+	// this.angle = Math.atan((a.y-b.y)/(a.x-b.x));
+	this.draw = () => {
+		cvs.lineWidth = 4;
+		cvs.beginPath();
+		cvs.moveTo(a.x, a.y);
+		cvs.lineTo(b.x,b.y);
+		cvs.stroke();
+		cvs.closePath();
+	}
+}
+
+function Eshield_piece(l,live_time) {
+	this.time=live_time;
+	this.line=l;
+}
+
+function Player() {
+	this.color="#000000";
+
+	this.in_fire = false;
+	this.weapon = 0;
+	this.bullet = new Array(weapons.bullet[0],weapons.bullet[1],weapons.bullet[2],weapons.bullet[3]);
+	this.reload_weapon = new Array(0,0,0,0);
+
+	this.space_jump = 0;
+	this.blood = 100;
+	this.real_blood = 100;
+	this.blood_limit = 100;
+	this.rblood_drop = 0;
+
+	this.have_eshield = 0;
+	this.max_eshield = 0;
+	this.draw_eshield = new Array();
+
+	this.bullets = new Array();
+
+	this.have_effects = new Array();
+	this.been_effects = new Array();
+
+	this.d = 1;
+
+	this.x = 150;
+	this.y = -500;
+
+	this.xa = 0;
+	this.ya = 0;
+
+	this.xaa = 0;
+	this.yaa = 0.5 * common_spd;
+
+	this.fire_cnt = 0;
+	this.fire_time = 0;
+
+	this.jump = () => {
+		if(this.count_been_effect(effects.LOCKDOWN)) {
+			return;
+		}
+		if (this.space_jump >= 3) { return; }
+		this.ya = -25 * common_spd;
+		this.space_jump += 1;
+	};
+
+	this.update = () => {
+		if (Math.abs(this.xa) < 1e-6) { this.xaa = 0; }
+		this.xa += this.xaa;
+		this.ya += this.yaa;
+		this.ya = min(this.ya, 10);
+		this.x += this.xa;
+		
+		if(this.have_eshield < this.max_eshield && clock % 60 == 0) {
+			this.have_eshield += 1;
+		}
+		// this.check_hit_shield();
+
+		this.real_blood=max(this.blood,this.real_blood-max(0,this.rblood_drop));
+		if(this.real_blood!=this.blood)
+		{
+			this.rblood_drop += 0.02;
+		} else {
+			this.rblood_drop = -0.5;
+		}
+
+		if (this.ya >= 0) {
+			for (let l in lands) {
+				if (lands[l].check_crash(this.x, this.y, ph + this.ya)) {
+					this.y = lands[l].y - ph;
+					this.ya = 0;
+					this.space_jump = 0;
+					break;
+				}
+			}
+		}
+		this.y += this.ya;
+
+		if (this.fire_time > 0) {
+			this.fire_time -= 1;
+		}
+		if(this.reload_weapon[this.weapon] > 0) {
+			this.reload_weapon[this.weapon] -= 1;
+		}
+		// console.log("Checking reload :",this.bullet,this.reload_weapon[this.weapon]);
+		if(this.bullet[this.weapon] <= 0 && this.reload_weapon[this.weapon] <= 0) {
+			// console.log("Done reloading!");
+			this.bullet[this.weapon]=weapons.bullet[this.weapon];
+		}
+		// console.log(this.fire_time);
+		if (this.in_fire && this.fire_time == 0) {
+			this.fire();
+		} else if(this.fire_time == 0) {
+			this.fire_cnt -= 0.35;
+			this.fire_cnt = max(this.fire_cnt, 0);
+		}
+
+		for (let i in this.bullets) {
+			this.bullets[i].update();
+			// alert("Have a bullet");
+			if(this.bullets[i].alive()) {
+				this.bullets[i].draw();
+			}
+		}
+
+		if (true) {
+			let n = new Array();
+			for (let i in this.bullets) {
+				let e = this.bullets[i];
+				if (e.alive()) {
+					n.push(e);
+				}
+			}
+			this.bullets = n;
+		}
+		// console.log(this.blood_limit);
+		if (this.count_have_effect(effects.HEAL)) {
+			this.blood += this.count_have_effect(effects.HEAL)/10.0;
+			if(this.blood>=this.blood_limit)this.blood=this.blood_limit;
+		}
+		if (this.count_been_effect(effects.ACID)) {
+			this.been_attacked(this.count_been_effect(effects.ACID)/20.0);
+		}
+
+		for (let i in this.draw_eshield) {
+			this.draw_eshield[i].time -= 1;
+			if(this.draw_eshield[i].time <= 0) {
+				this.draw_eshield[i]=this.draw_eshield[this.draw_eshield.length-1];
+				this.draw_eshield.pop();
+				// console.log("Del an eshield "+this.draw_eshield.length);
+			}
+		}
+
+		this.check_hit_pack();
+		this.update_effects();
+
+		this.draw();
+	};
+
+	this.get_firebar_color = () => {
+		if (this.fire_cnt!=0) { return colors.FIREBAR[Math.floor((this.fire_cnt-1)/10)]; }
+		else { return "#FFFFFF"; }
+	}
+
+	this.draw = () => {
+		cvs.fillStyle = this.color;
+		cvs.fillRect(this.x, this.y, pw, ph);
+		cvs.fillRect(this.x + pw * this.d, this.y, 5, 5);
+		cvs.font = "10px Consolas";
+		// cvs.fillText(Math.ceil((this.blood.toFixed(2))), this.x - 15, this.y - 10);
+		cvs.fillStyle = colors.WEAPON_PACK;
+		cvs.fillText(weapons.name[this.weapon],this.x-5,this.y-5);
+		if(this.bullet[this.weapon]==0){
+			cvs.fillStyle = colors.WEAPON_PACK + "88";
+			cvs.fillText(this.reload_weapon[this.weapon].toString(),this.x+5,this.y-5);
+		} else {
+			cvs.fillText(this.bullet[this.weapon].toString(),this.x+5,this.y-5);
+		}
+		cvs.fillStyle = colors.BARBACKGROUND + "88";
+		cvs.fillRect(this.x - 15,this.y + 25,30,3);
+		// console.log(this.get_firebar_color());
+		cvs.fillStyle = (this.get_firebar_color()) + "BB";
+		cvs.fillRect(this.x - this.fire_cnt / 100 * 60 / 2, this.y + 25,this.fire_cnt / 100 * 60, 3);
+		cvs.fillStyle = colors.SIGHT_LINE + weapons.sightline_opaque[this.weapon];
+		cvs.fillRect((this.d==1 ? this.x : 0), this.y + 3, (this.d == 1 ? w - this.x : this.x), 1);
+		// console.log(this.draw_eshield.length);
+		for (let i in this.draw_eshield) {
+			// console.log(">"+i);
+			let e = this.draw_eshield[i];
+			cvs.strokeStyle = colors.ENERGY_SHIELD;
+			e.line.draw();
+		}
+	};
+
+	this.left = () => {
+		if (!this.count_been_effect(effects.LOCKDOWN)) {
+			this.xaa = 0.1;
+			this.xa = -5;
+		}
+		this.d = -1;
+	};
+
+	this.right = () => {
+		if (!this.count_been_effect(effects.LOCKDOWN)) {
+			this.xaa = -.1;
+			this.xa = 5;
+		}
+		this.d = 1;
+	};
+
+	this.fire = () => {
+		// console.log(this.fire_time,this.bullet,this.reload_weapon[this.weapon]);
+		if (this.fire_time != 0 || this.bullet == 0 || this.reload_weapon[this.weapon] > 0) {
+			return;
+		}
+		if (this.bullet[this.weapon]>=1)
+		{
+			this.bullet[this.weapon] -= 1;
+		}
+		this.fire_time = weapons.firebreak[this.weapon];
+		if (this.fire_cnt < 50) {
+			this.fire_cnt += 1;
+		}
+		let ef = new Array();
+		if (this.count_have_effect(effects.LOCKDOWN)){
+			ef.push(new Effect(effects.LOCKDOWN,effects.been_times[effects.LOCKDOWN]));
+		}
+		if (this.count_have_effect(effects.SUPPRESSION)){
+			ef.push(new Effect(effects.SUPPRESSION,effects.been_times[effects.SUPPRESSION]));
+		}
+		if (this.count_have_effect(effects.ACID)){
+			ef.push(new Effect(effects.ACID,effects.been_times[effects.ACID]));
+		}
+		for(let i = 0; i < weapons.bulletspertime[this.weapon] ; i+=1) {
+			this.bullets.push(new Bullet(this.x , this.y + 3, this.d, ef, this.fire_cnt, this.weapon, this.count_been_effect(effects.SUPPRESSION)));
+		}
+		this.xaa = this.d * .01;
+		this.xa = -this.d * 1;
+		if (this.bullet[this.weapon]==0)
+		{
+			this.reload_weapon[this.weapon] = weapons.reload_time[this.weapon];
+		}
+	};
+
+	this.check_hit = (target) => {
+		for (let i in this.bullets) {
+			let e = this.bullets[i];
+			if (!e.alive()) { continue; }
+			if (e.check_crash(target)) {
+				target.been_hit(e);
+				e.done = true;
+				break;
+			}
+		}
+	}
+
+	this.check_hit_shield = (target) => {
+		for (let i in this.bullets) {
+			let e = this.bullets[i];
+			if (!e.alive()) { continue; }
+			if (dist(e.x+e.xa,e.y+e.ya,target.x,target.y) <= 50) {
+				// console.log("shield?");
+				if(target.shield_defend(e)) {
+					e.done = true;
+				}
+			}
+		}
+	}
+
+	this.shield_defend = (d) => {
+		if (this.have_eshield == 0) return 0;
+		// console.log("shield!");
+		this.x=this.x+pw/2;
+		this.y=this.y+ph/2;
+		let si=(d.x-this.x)/50,cs=(d.y-this.y)/50;
+		for(let i=1;i>=0.001;i=i/2) {
+			if(dist(d.x+d.xa*i,d.y+d.ya*i,this.x,this.y)>=50) {
+				d.x+=d.xa*i;
+				d.y+=d.ya*i;
+			}
+		}
+		let l = new Line(new Position(d.x+eshieldlength/2*cs,d.y-eshieldlength/2*si),new Position(d.x-eshieldlength/2*cs,d.y+eshieldlength/2*si));
+		this.draw_eshield.push(new Eshield_piece(l,10));
+		this.x=this.x-pw/2;
+		this.y=this.y-ph/2;
+		if (this.have_eshield <= d.damage) {
+			this.have_eshield = 0;
+			this.max_eshield = 0;
+			return 1;
+		}
+		this.have_eshield -= d.damage;
+		return 1;
+	}
+
+	this.check_hit_pack = () => {
+		for (let i in effectpacks) {
+			let e = effectpacks[i];
+			// if (!e.alive()) { continue; }
+			// alert("Checking packs");
+			if (e.check_pack_crash(this.x, this.y, kw, kh)) {
+				// alert("Pick a pack with effect "+e.type);
+				effectpacks[i].alive=0;
+				this.pick_effect_pack(new Effect(e.effect,e.time));
+				break;
+			}
+		}
+		for (let i in weaponpacks) {
+			let e = weaponpacks[i];
+			if (e.check_pack_crash(this.x, this.y, kw, kh)) {
+				weaponpacks[i].alive=0;
+				this.pick_weapon_pack(e.weapon);
+			}
+		}
+		for (let i in shieldpacks) {
+			let e = shieldpacks[i];
+			if (e.check_pack_crash(this.x, this.y, kw, kh)) {
+				shieldpacks[i].alive=0;
+				this.pick_shield_pack();
+			}
+		}
+	}
+
+	this.pick_effect_pack = (d) => {
+		this.have_effects.push(d);
+	}
+	this.pick_weapon_pack = (d) => {
+		if (this.weapon == d) this.bullet += weapons.bullet[d];
+		else this.bullet = weapons.bullet[d];
+		this.weapon = d;
+	}
+	this.pick_shield_pack = () => {
+		this.max_eshield = 30;
+		this.have_eshield = 30;
+	}
+
+	this.count_been_effect = (d) => {
+		let ret = 0;
+		for (let i in this.been_effects) {
+			if (this.been_effects[i].type==d) {
+				ret += 1;
+			}
+		}
+		return ret;
+	}
+	this.count_have_effect = (d) => {
+		let ret = 0;
+		for (let i in this.have_effects) {
+			if (this.have_effects[i].type==d) {
+				ret += 1;
+			}
+		}
+		return ret;
+	}
+
+	this.find_been_effect = (d) => {
+		let ret = new Array();
+		for (let i in this.been_effects) {
+			if (this.been_effects[i].type==d) {
+				ret.push(this.been_effects[i]);
+			}
+		}
+		return ret;
+	}
+	this.find_have_effect = (d) => {
+		let ret = new Array();
+		for (let i in this.have_effects) {
+			if (this.have_effects[i].type==d) {
+				ret.push(this.have_effects[i]);
+			}
+		}
+		return ret;
+	}
+
+	this.update_effects = () => {
+		for (let i in this.have_effects) {
+			this.have_effects[i].dtime();
+			let e=this.have_effects[i];
+			if (e.time <= 0){
+				this.have_effects[i]=this.have_effects[this.have_effects.length-1];
+				this.have_effects.pop();
+			}
+		}
+		for (let i in this.been_effects) {
+			this.been_effects[i].dtime();
+			let e=this.been_effects[i];
+			if (e.time <= 0){
+				this.been_effects[i]=this.been_effects[this.been_effects.length-1];
+				this.been_effects.pop();
+			}
+		}
+	}
+
+	this.been_hit = (e) => {
+		d = -e.d;
+		// console.log(e.effects);
+		for (let i in e.effects) {
+			if(effects.opposite[e.effects[i].type]!=-1&&this.count_have_effect(effects.opposite[e.effects[i].type])==0) {
+				this.been_effects.push(e.effects[i]);
+				this.have_effects.push(new Effect(effects.opposite[e.effects[i].type],effects.have_times[effects.opposite[e.effects[i].type]]));
+			} else if (effects.opposite[e.effects[i].type] == -1) {
+				this.been_effects.push(e.effects[i]);
+			}
+		}
+		if (!this.count_been_effect(effects.LOCKDOWN)){
+			this.xaa = d * e.repel/100;
+			this.xa += -d * e.repel;
+		}
+		this.been_attacked(e.damage);
+	}
+
+	this.been_attacked = (dmg) => {
+		this.blood -= dmg;
+		this.blood_limit -= dmg/2;
+	}
+
+	this.alive = () => {
+		if (this.blood <= 0 || this.y > w + 100) { return false; }
+		return true;
+	};
+
+	this.down = () => {
+		if(this.count_been_effect(effects.LOCKDOWN)) {
+			return;
+		}
+		this.y += ph + 1;
+	};
+
+	this.start_fire = () => {
+		this.in_fire = true;
+	};
+
+	this.stop_fire = () => {
+		this.in_fire = false;
+	};
+
+	this.change_weapon = () => {
+		this.weapon = (this.weapon + 1) % 4;
+	}
+}
+
+function Effect_pack(x, y, tp) {
+	this.x=x;
+	this.y=y;
+	this.effect = tp;
+	this.time = effects.have_times[tp];
+	this.alive = 1;
+	this.check_pack_crash = (x, y, xl, yl) => {
+		// alert(x+" "+this.x+" "+y+" "+this.y);
+		xl=yl=30;
+		if (!this.alive){
+			return false;
+		}
+		if ((x - xl <= this.x && x + xl >= this.x) && (y - yl <= this.y && y + yl >= this.y)) {
+			return true;
+		}
+		return false;
+	};
+	this.draw = () => {
+		if(!this.alive){
+			return;
+		}
+		cvs.fillStyle = effects.colors[this.effect];
+		cvs.fillRect(x-(kh/2),y-(kw/2),kh,kw);
+	};
+}
+
+function Weapon_pack(x, y, tp) {
+	this.x=x;
+	this.y=y;
+	this.weapon = tp;
+	this.alive = 1;
+	this.check_pack_crash = (x, y, xl, yl) => {
+		// alert(x+" "+this.x+" "+y+" "+this.y);
+		xl=yl=30;
+		if (!this.alive){
+			return false;
+		}
+		if ((x - xl <= this.x && x + xl >= this.x) && (y - yl <= this.y && y + yl >= this.y)) {
+			return true;
+		}
+		return false;
+	};
+	this.draw = () => {
+		if(!this.alive){
+			return;
+		}
+		// console.log("Drawing a pack with weapon");
+		cvs.fillStyle = colors.WEAPON_PACK;
+		cvs.fillRect(x-(kh/2),y-(kw/2),kh,kw);
+	};
+}
+
+function Shield_pack(x, y) {
+	this.x=x;
+	this.y=y;
+	this.alive = 1;
+	this.check_pack_crash = (x, y, xl, yl) => {
+		// alert(x+" "+this.x+" "+y+" "+this.y);
+		xl=yl=30;
+		if (!this.alive){
+			return false;
+		}
+		if ((x - xl <= this.x && x + xl >= this.x) && (y - yl <= this.y && y + yl >= this.y)) {
+			return true;
+		}
+		return false;
+	};
+	this.draw = () => {
+		if(!this.alive){
+			return;
+		}
+		// console.log("Drawing a pack with weapon");
+		cvs.fillStyle = colors.ENERGY_SHIELD;
+		cvs.fillRect(x-(kh/2),y-(kw/2),kh,kw);
+	};
+}
+
+function Land(x, y, l) {
+	this.len = l || 150;
+	this.x = x || get_random(50,w-this.len-50);
+	this.y = y || get_random(100,h);
+	//console.log("Land at "+this.x.toString()+" , "+this.y.toString());
+
+	this.check_crash = (x, y, h) => {
+		if (x >= this.x && x <= this.x + this.len) {
+			if (y <= this.y && y + h >= this.y) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	this.draw = () => {
+		cvs.fillStyle = colors.LAND;
+		cvs.fillRect(this.x, this.y, this.len, 2);
+	};
+}
+
+function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
+	this.d = d;
+	this.done = false;
+
+	this.effects=ef;
+	this.damage=weapons.damage[ty]*(!is_suppressed?1:0.5);
+
+	this.x = x;
+	this.y = y;
+
+	this.sx = x;
+	this.sy = y;
+
+	this.repel=weapons.repel[ty];
+
+	this.len = weapons.len[ty];
+	this.maxdis=weapons.maxdis[ty];
+
+	this.xa = d * 5 * weapons.speed[ty];
+	this.ya = (Math.round(Math.random() * weapons.spread[ty] * ((fcnt+10)/100)) - weapons.spread[ty]/2 * (fcnt+10) / 100) * Math.random() / 4;
+
+	this.xaa = 0;
+	this.yaa = weapons.bullet_drop[ty]/1000;
+
+	this.update = () => {
+		this.x += this.xa;
+		this.y += this.ya;
+		this.xa += this.xaa;
+		this.ya += this.yaa;
+
+		// console.log("A bullet flew " + dist(this.x, this.y, this.sx, this.sy));
+		if(dist(this.x, this.y, this.sx, this.sy)>=this.maxdis) {
+			// console.log("Done!");
+			this.done=1;
+		}
+	};
+
+	this.count_effect = (d) => {
+		for (let i in this.effects) {
+			if (this.effects[i].type==d) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	this.draw = () => {
+		if (this.effects.length) {
+			for (let i in this.effects) {
+				let e=this.effects[i];
+				cvs.fillStyle = effects.colors[e.type];
+				cvs.fillRect(this.x + 10/this.effects.length*i, this.y, this.len/this.effects.length, 3);
+			}
+		}
+		else {
+			cvs.fillStyle = colors.NORMALBULLET;
+			cvs.fillRect(this.x, this.y, this.len, 3);
+		}
+	};
+
+	this.alive = () => {
+		if (this.done || this.x < 0 || this.x > w) { return false; }
+		return true;
+	};
+
+	this.check_crash = (p) => {
+		if (common_check_crash({
+			x:p.x,
+			y:p.y,
+			xl:pw,
+			yl:ph,
+			xa:p.xa,
+			ya:p.ya
+		},{
+			x:this.x,
+			y:this.y,
+			yl:this.len,
+			xa:this.xa,
+			ya:this.ya
+		})) {
+			return true;
+		}
+		return false;
+	};
+}
+
+function make_map() {
+	for (let i = 0; i < 30; i += 1) { lands.push(new Land()) }
+	lands.sort((x, y) => { return y.y - x.y; });
+}
+
+var AI = new artificial_idiot(playerA,playerB);
+
+function init() {
+	cvs = document.getElementById('board').getContext('2d');
+
+	make_map();
+
+	// AI.init();
+
+	playerA.x = w - 150;
+
+	requestAnimationFrame(update);
+}
+
+function draw_background() {
+	cvs.fillStyle = colors.BACKGROUND;
+	cvs.fillRect(0, 0, w, h);
+}
+
+function generatepack() {
+	if(Math.random()<=1/500) {
+		let posx,posy;
+		let e=get_random(0,lands.length-1);
+		let ef=get_random(1,4);
+		effectpacks.push(new Effect_pack(lands[e].x+get_random(20,lands[e].len-20),lands[e].y-10,ef));
+	}
+	// if(Math.random()<=1/500) {
+	// 	let posx,posy;
+	// 	let e=get_random(0,lands.length-1);
+	// 	let wp=get_random(1,2);
+	// 	weaponpacks.push(new Weapon_pack(lands[e].x+get_random(20,lands[e].len-20),lands[e].y-10,wp));
+	// }
+	if(Math.random()<=1/3500) {
+		let posx,posy;
+		let e=get_random(0,lands.length-1);
+		shieldpacks.push(new Shield_pack(lands[e].x+get_random(20,lands[e].len-20),lands[e].y-10));
+	}
+}
+function delpacks() {
+	for (let i in effectpacks) {
+		if (!effectpacks[i].alive) {
+			effectpacks[i] = effectpacks[effectpacks.length - 1];
+			effectpacks.pop();
+		}
+	}
+	for (let i in shieldpacks) {
+		if (!shieldpacks[i].alive) {
+			shieldpacks[i] = shieldpacks[shieldpacks.length - 1];
+			shieldpacks.pop();
+		}
+	}
+} 
+
+function draweffects(x,y,p,ty) {
+	let vis=new Array();
+	vis.push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+	cvs.font="20px Consolas";
+	y = y + 30;
+	for (let i in p.have_effects) {
+		let e=p.have_effects[i];
+		let str=effects.names[e.type];
+		if(vis[e.type]) {
+			continue;
+		}
+		// console.log(e.type, str);
+		vis[e.type] = 1;
+		cvs.fillStyle = colors.GOODEFFECTS;
+		cvs.fillText(str,x-ty*11*str.length,y);
+		cvs.fillStyle = colors.GOODEFFECTSBAR;
+		let efs=p.find_have_effect(e.type);
+		for (let j in efs) {
+			let e1=efs[j];
+			cvs.fillRect(x-ty*pbw*(e1.time/e1.atime),y+10,pbw*(e1.time/e1.atime),pbh)
+		}
+		y = y + 30;
+	}
+	vis[0]=vis[1]=vis[2]=vis[3]=vis[4]=0;
+	for (let i in p.been_effects) {
+		let e=p.been_effects[i];
+		let str=effects.names[e.type];
+		if(vis[e.type]) {
+			continue;
+		}
+		vis[e.type] = 1;
+		cvs.fillStyle = colors.BADEFFECTS;
+		cvs.fillText(str,x-ty*11*str.length,y);
+		cvs.fillStyle = colors.BADEFFECTSBAR;
+		let efs=p.find_been_effect(e.type);
+		for (let j in efs) {
+			let e1=efs[j];
+			cvs.fillRect(x-ty*pbw*(e1.time/e1.atime),y+10,pbw*(e1.time/e1.atime),pbh)
+		}
+		y = y + 30;
+	}
+}
+
+function drawhpbar(p,ty) {
+	cvs.fillStyle = colors.BARBACKGROUND;
+	cvs.fillRect(ty*(w-hpbw),1,hpbw,hpbh);
+	cvs.fillStyle = colors.HPBAR_LIMIT;
+	cvs.fillRect(ty*w-ty*hpbw+(1-ty)*(Math.round(hpbw*(p.blood_limit)/100)),1,Math.round(hpbw*(100-p.blood_limit)/100),hpbh);
+	cvs.fillStyle = colors.HPBAR_RB;
+	cvs.fillRect(ty*(w-Math.round(p.real_blood/100*hpbw)),1,Math.round(hpbw*p.real_blood/100),hpbh);
+	cvs.fillStyle = colors.HPBAR;
+	cvs.fillRect(ty*(w-Math.round(p.blood/100*hpbw)),1,Math.round(hpbw*p.blood/100),hpbh);
+	let str=Math.round(p.blood).toString();
+	let blen=str.length*11;
+	cvs.font="20px Consolas";
+	cvs.fillText(str,ty*w-ty*hpbw-ty*10-ty*blen+(1-ty)*(hpbw+10),18);
+}
+function drawshieldbar(p,ty) {
+	cvs.fillStyle = colors.BARBACKGROUND;
+	cvs.fillRect(ty*(w-hpbw),1+hpbh,hpbw,hpbh);
+	cvs.fillStyle = colors.ENERGY_SHIELD;
+	cvs.fillRect(ty*(w-Math.round(p.have_eshield/30*hpbw)),1+hpbh,Math.round(hpbw*p.have_eshield/30),hpbh);
+	let str=Math.round(p.have_eshield).toString();
+	let blen=str.length*11;
+	cvs.font="20px Consolas";
+	cvs.fillText(str,ty*w-ty*hpbw-ty*10-ty*blen+(1-ty)*(hpbw+10),18+hpbh);
+}
+
+function update() {
+	clock += 1;
+	if (clock % 1 == 1) {
+		lands.shift(1);
+		lands.push(new Land());
+	}
+
+	draw_background();
+
+	generatepack();
+	delpacks();
+	// console.log(effectpacks.length);
+
+	playerA.check_hit_shield(playerB);
+	playerB.check_hit_shield(playerA);
+	playerA.check_hit(playerB);
+	playerB.check_hit(playerA);
+
+	AI.update();
+	playerA.update();
+	playerB.update();
+
+	drawhpbar(playerA,1);
+	drawhpbar(playerB,0);
+	drawshieldbar(playerA,1);
+	drawshieldbar(playerB,0);
+
+	draweffects(20,50,playerB,0);
+	draweffects(w-20,50,playerA,1);
+
+	if (!playerA.alive() && !playerB.alive()) { alert('Draw!'); return; }
+	if (!playerA.alive()) { alert('PlayerB Win!'); return; }
+	if (!playerB.alive()) { alert('PlayerA win!'); return; }
+
+	for (let i in lands) { lands[i].draw(); }
+	for (let i in effectpacks) { effectpacks[i].draw(); }
+	for (let i in weaponpacks) { weaponpacks[i].draw(); }
+	for (let i in shieldpacks) { shieldpacks[i].draw(); }
+
+	requestAnimationFrame(update);
+}
+
+playerA.color=colors.PLAYERA;
+playerB.color=colors.PLAYERB;
+
+onload = init;
+onkeydown = function(x) {
+	let k = x.key;
+	if (k == 'ArrowUp') {
+		playerA.jump();
+	} else if (k == 'ArrowLeft') {
+		playerA.left();
+	} else if (k == 'ArrowRight') {
+		playerA.right();
+	} else if (k == 'ArrowDown') {
+		playerA.down()
+	} else if (k == 'w') {
+		playerB.jump();
+	} else if (k == 'a') {
+		playerB.left();
+	} else if (k == 'd') {
+		playerB.right();
+	} else if (k == 's') {
+		playerB.down();
+	} else if (k == ',') {
+		playerA.start_fire();
+	} else if (k == 'g') {
+		playerB.start_fire();
+	} else if (k == 'h') {
+		playerB.change_weapon();
+	} else if (k == '.') {
+		playerA.change_weapon();
+	}
+}
+
+onkeyup = function(x) {
+	let k = x.key;
+	if (k == ',') {
+		playerA.stop_fire();
+		// playerA.fire();
+	} else if (k == 'g') {
+		playerB.stop_fire();
+		// playerB.fire();
+	}
+}
+
+function artificial_idiot(A, B){
+	this.last_fire=0;
+	this.last_jump=0;
+	this.picking_pack=0;
+	this.lst_hveefc=0;
+	// this.continue_down = 0;
+
+	this.reach = (x, y) => {
+		if(A.y > y && this.last_jump <= 0){
+			this.last_jump = 60;
+			A.jump();
+		}
+		if(A.y < y && A.ya == 0){
+			A.down();
+		}
+		if(A.x < x - 30){
+			A.right();
+		}
+		if(A.x > x + 30){
+			A.left();
+		}
+	}
+	this.leave = (x, y) => {
+		if(A.y < y && this.last_jump <= 0){
+			this.last_jump = 60;
+			A.jump();
+		}
+		if(A.y > y && A.ya == 0){
+			A.down();
+		}
+		if(A.x > x - 30){
+			A.right();
+		}
+		if(A.x < x + 30){
+			A.left();
+		}
+	}
+
+	this.fire_at_B = () => {
+		if(B.y >= A.y-10 && B.y <= A.y+10){
+			if(A.d==-1 && A.x < B.x){
+				A.right();
+			}
+			if(A.d== 1 && A.x > B.x){
+				A.left();
+			}
+			A.start_fire();
+			if(A.xa >= 2){
+				if(A.d == 1){
+					A.right();
+				}else{
+					A.left();
+				}
+			}
+		}else{
+			A.stop_fire();
+		}
+	}
+
+	this.pick_effect_pack = () => {
+		if(this.last_fire < 180 || effectpacks.length+shieldpacks.length==0) return;
+		let px=1e9,py=1e9;
+		for (let i in effectpacks){
+			e = effectpacks[i];
+			if(dist(A.x,A.y,e.x,e.y)<=dist(A.x,A.y,px,py)){
+				px=e.x;
+				py=e.y;
+			}
+		}
+		for (let i in shieldpacks){
+			e = shieldpacks[i];
+			if(dist(A.x,A.y,e.x,e.y)<=dist(A.x,A.y,px,py)){
+				px=e.x;
+				py=e.y;
+			}
+		}
+		this.picking_pack=1;
+		this.reach(px,py);
+	}
+
+	this.picked_pack = () => {
+		
+	}
+
+	this.update = () => {
+		// this.last_jump -= 1;
+		// if(!this.in_fire)this.last_fire += 1;
+		// this.fire_at_B();
+		// if(dist(A.x,A.y,B.x,B.y)<=200 || effectpacks.length+shieldpacks.length==0 || A.have_effects.length!=this.lst_hveefc ){
+		// 	this.picking_pack=0;
+		// }
+		// this.lst_hveefc=A.have_effects.length;
+		// if(A.bullet[A.weapon]<=weapons.bullet[A.weapon]/6){
+		// 	this.leave(B.x,B.y);
+		// 	A.start_fire();
+		// } else if(!this.picking_pack){
+		// 	this.reach(B.x,B.y);
+		// }
+		// if(A.bullet[A.weapon]<=0){
+		// 	A.stop_fire();
+		// 	A.change_weapon();
+		// }
+		// this.pick_effect_pack();
+	}
+
+	// this.init = () => {
+		// setInterval(this.update(), 100);
+	// }
+}
+
+</script>
+
+<style type="text/css">
+
+</style>
