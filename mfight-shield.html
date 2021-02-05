@@ -71,6 +71,7 @@ var common_spd = .4;
 var pbw = 100,pbh = 3;
 var hpbw = 500 ,hpbh= 20;
 var eshieldlength = 20;
+var MAX_ESHIELD = 30 ;
 max = Math.max;
 min = Math.min;
 
@@ -485,8 +486,8 @@ function Player() {
 		this.weapon = d;
 	}
 	this.pick_shield_pack = () => {
-		this.max_eshield = 30;
-		this.have_eshield = 30;
+		this.max_eshield = MAX_ESHIELD;
+		this.have_eshield = MAX_ESHIELD;
 	}
 
 	this.count_been_effect = (d) => {
@@ -899,7 +900,7 @@ function drawshieldbar(p,ty) {
 	cvs.fillStyle = colors.BARBACKGROUND;
 	cvs.fillRect(ty*(w-hpbw),1+hpbh,hpbw,hpbh);
 	cvs.fillStyle = colors.ENERGY_SHIELD;
-	cvs.fillRect(ty*(w-Math.round(p.have_eshield/30*hpbw)),1+hpbh,Math.round(hpbw*p.have_eshield/30),hpbh);
+	cvs.fillRect(ty*(w-Math.round(p.have_eshield/MAX_ESHIELD*hpbw)),1+hpbh,Math.round(hpbw*p.have_eshield/MAX_ESHIELD),hpbh);
 	let str=Math.round(p.have_eshield).toString();
 	let blen=str.length*11;
 	cvs.font="20px Consolas";
