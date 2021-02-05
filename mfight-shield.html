@@ -48,10 +48,10 @@ var weapons = {
 	firebreak:[8,4,180,150],
 	maxdis:[2500,2500,2500,300],
 	damage:[10,5,30,10],
-	bullet:[20,60,5,3],
+	bullet:[20,60,5,6],
 	speed:[3,2,15,8],
 	len:[15,8,30,20],
-	repel:[10,6,25,0],
+	repel:[10,6,25,5],
 	sightline_opaque:["00","00","77","00"],
 	name:["G","M","S","H"],
 	reload_time:[300,500,400,400],
@@ -230,6 +230,7 @@ function Player() {
 		
 		if(this.have_eshield < this.max_eshield && clock % 60 == 0) {
 			this.have_eshield += 1;
+			this.have_eshield = min(this.max_eshield , this.have_eshield);
 		}
 		// this.check_hit_shield();
 
@@ -591,7 +592,7 @@ function Player() {
 	};
 
 	this.change_weapon = () => {
-		this.weapon = (this.weapon + 1) % (weapons.count - 1);
+		this.weapon = (this.weapon + 1) % (weapons.count);
 	}
 }
 
@@ -744,7 +745,7 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 			for (let i in this.effects) {
 				let e=this.effects[i];
 				cvs.fillStyle = effects.colors[e.type];
-				cvs.fillRect(this.x + 10/this.effects.length*i, this.y, this.len/this.effects.length, 3);
+				cvs.fillRect(this.x + this.len/this.effects.length*i, this.y, this.len/this.effects.length, 3);
 			}
 		}
 		else {
@@ -769,7 +770,7 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 		},{
 			x:this.x,
 			y:this.y,
-			yl:this.len,
+			xl:this.len,
 			xa:this.xa,
 			ya:this.ya
 		})) {
@@ -920,14 +921,14 @@ function update() {
 	delpacks();
 	// console.log(effectpacks.length);
 
+	playerA.update();
+	playerB.update();
+	AI.update();
+
 	playerA.check_hit_shield(playerB);
 	playerB.check_hit_shield(playerA);
 	playerA.check_hit(playerB);
 	playerB.check_hit(playerA);
-
-	AI.update();
-	playerA.update();
-	playerB.update();
 
 	drawhpbar(playerA,1);
 	drawhpbar(playerB,0);
