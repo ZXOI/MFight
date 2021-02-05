@@ -44,6 +44,7 @@ var effects = {
 };
 
 var weapons = {
+	count:4,
 	firebreak:[8,4,180,150],
 	maxdis:[2500,2500,2500,300],
 	damage:[10,5,30,10],
@@ -171,8 +172,8 @@ function Player() {
 
 	this.in_fire = false;
 	this.weapon = 0;
-	this.bullet = new Array(weapons.bullet[0],weapons.bullet[1],weapons.bullet[2],weapons.bullet[3]);
-	this.reload_weapon = new Array(0,0,0,0);
+	this.bullet = new Array();
+	this.reload_weapon = new Array();
 
 	this.space_jump = 0;
 	this.blood = 100;
@@ -202,6 +203,13 @@ function Player() {
 
 	this.fire_cnt = 0;
 	this.fire_time = 0;
+
+	this.init = () => {
+		for(let i = 0 ; i < weapons.count ; i++) {
+			this.bullet.push(weapons.bullet[i]);
+			this.reload_weapon.push(0);
+		}
+	}
 
 	this.jump = () => {
 		if(this.count_been_effect(effects.LOCKDOWN)) {
@@ -582,7 +590,7 @@ function Player() {
 	};
 
 	this.change_weapon = () => {
-		this.weapon = (this.weapon + 1) % 4;
+		this.weapon = (this.weapon + 1) % (weapons.count - 1);
 	}
 }
 
@@ -782,6 +790,8 @@ function init() {
 
 	make_map();
 
+	playerA.init();
+	playerB.init();
 	// AI.init();
 
 	playerA.x = w - 150;
