@@ -50,7 +50,7 @@ var weapons = {
 	damage:[10,5,30,10],
 	bullet:[20,60,5,6],
 	speed:[3,2,15,8],
-	len:[15,8,30,20],
+	len:[350,8,30,20],
 	repel:[10,6,25,5],
 	sightline_opaque:["00","00","77","00"],
 	name:["G","M","S","H"],
@@ -390,7 +390,7 @@ function Player() {
 			ef.push(new Effect(effects.ACID,effects.been_times[effects.ACID]));
 		}
 		for(let i = 0; i < weapons.bulletspertime[this.weapon] ; i+=1) {
-			this.bullets.push(new Bullet(this.x , this.y + 3, this.d, ef, this.fire_cnt, this.weapon, this.count_been_effect(effects.SUPPRESSION)));
+			this.bullets.push(new Bullet(this.x + (this.d-1)*weapons.len[this.weapon]/2 , this.y + 3, this.d, ef, this.fire_cnt, this.weapon, this.count_been_effect(effects.SUPPRESSION)));
 		}
 		this.xaa = this.d * .01;
 		this.xa = -this.d * 1;
