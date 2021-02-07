@@ -1,6 +1,7 @@
 # MFight
 
 **A 1V1 battle game with many kinds of weapons and effects**  
+**Please ignore the grammar and spelling mistakes in this README.md**
 
 ## Controlling
 
