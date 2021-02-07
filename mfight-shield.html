@@ -1,8 +1,19 @@
 <div id=main>
-	<canvas id="board" width="1500px", height="800px"></canvas>
+	<canvas id="board" width="1200px", height="600px"></canvas>
 </div>
 
 <script type="text/javascript">
+
+var w = 1200, h = 600;
+var ph = 20, pw = 5;
+var kh = 10, kw = 10;
+var common_spd = .4;
+var pbw = w/15,pbh = 3;
+var hpbw = w/3 ,hpbh= h/40;
+var eshieldlength = 20;
+var MAX_ESHIELD = 30 ;
+max = Math.max;
+min = Math.min;
 
 var colors = {
 	FIREBAR:["#00FF00","#6EFF00","#FFFF00","#FFAC00","#FF0000"],
@@ -46,12 +57,12 @@ var effects = {
 var weapons = {
 	count:4,
 	firebreak:[8,4,180,150],
-	maxdis:[2500,2500,2500,300],
+	maxdis:[w*3/2,w*3/2,w*3/2,w/5],
 	damage:[10,5,30,10],
 	bullet:[20,60,5,6],
-	speed:[3,2,15,8],
-	len:[10,8,30,20],
-	repel:[10,6,25,5],
+	speed:[w/500,w/750,w/100,w/190],
+	len:[w/100,w/170,w/30,w/55],
+	repel:[w/150,w/250,w/60,w/300],
 	sightline_opaque:["00","00","77","00"],
 	name:["G","M","S","H"],
 	reload_time:[300,500,400,400],
@@ -63,17 +74,6 @@ var weapons = {
 	SNIPER:2,
 	SHOTGUN:3
 };
-
-var ph = 20, pw = 5;
-var kh = 10, kw = 10;
-var w = 1500, h = 800;
-var common_spd = .4;
-var pbw = 100,pbh = 3;
-var hpbw = 500 ,hpbh= 20;
-var eshieldlength = 20;
-var MAX_ESHIELD = 30 ;
-max = Math.max;
-min = Math.min;
 
 var cvs;
 var playerA = new Player();
@@ -674,7 +674,7 @@ function Shield_pack(x, y) {
 }
 
 function Land(x, y, l) {
-	this.len = l || 150;
+	this.len = l || w/10;
 	this.x = x || get_random(50,w-this.len-50);
 	this.y = y || get_random(100,h);
 	//console.log("Land at "+this.x.toString()+" , "+this.y.toString());
@@ -697,12 +697,13 @@ function Land(x, y, l) {
 function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 	this.d = d;
 	this.done = false;
+	this.ty = ty;
 
-	this.effects=ef;
-	this.damage=weapons.damage[ty]*(!is_suppressed?1:0.5);
+	this.effects = ef;
+	this.damage = weapons.damage[ty]*(!is_suppressed?1:0.5);
 
-	this.x = x;
-	this.y = y;
+	this.x = x+d*weapons.len[ty]/2;
+	this.y = y+1;
 
 	this.sx = x;
 	this.sy = y;
@@ -719,6 +720,8 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 	this.yaa = weapons.bullet_drop[ty]/1000;
 
 	this.update = () => {
+		console.log(this.x,this.y);
+		console.log("A Bullet");
 		this.x += this.xa;
 		this.y += this.ya;
 		this.xa += this.xaa;
@@ -741,6 +744,8 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 	}
 
 	this.draw = () => {
+		this.x-=this.d*weapons.len[this.ty]/2;
+		this.y-=1;
 		if (this.effects.length) {
 			for (let i in this.effects) {
 				let e=this.effects[i];
@@ -752,6 +757,8 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 			cvs.fillStyle = colors.NORMALBULLET;
 			cvs.fillRect(this.x, this.y, this.len, 3);
 		}
+		this.x+=this.d*weapons.len[this.ty]/2;
+		this.y+=1;
 	};
 
 	this.alive = () => {
@@ -768,8 +775,8 @@ function Bullet(x, y, d, ef, fcnt, ty, is_suppressed) {
 			xa:p.xa,
 			ya:p.ya
 		},{
-			x:this.x,
-			y:this.y,
+			x:this.x-this.d*this.len/2,
+			y:this.y-1,
 			xl:this.len,
 			xa:this.xa,
 			ya:this.ya
