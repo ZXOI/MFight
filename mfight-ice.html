@@ -28,6 +28,7 @@ var colors = {
 	SUPPRESSION:"#FF0000",
 	ACID:"#A6E22E",
 	HEAL:"#00FF00",
+	ICE:"#66D9EF",
 	BACKGROUND:"#272822",
 	ENERGY_SHIELD:"#819AFF",
 	LAND:"#F8F8F2",
@@ -40,18 +41,23 @@ var colors = {
 };
 
 var effects = {
-	colors:["#FFFFFF",colors.LOCKDOWN,colors.SUPPRESSION,colors.ACID,colors.HEAL,"#FFFFFF","#FFFFFF"],
-	names:["None","Lockdown","Suppression","Acid","Heal","Lockdown resistance","Suppression resistance"],
-	opposite:[-1,5,6,-1,-1,-1,-1],
-	have_times:[0,400,600,300,251,400,700],
-	been_times:[0,200,400,100,0,0,0],
+	count : 8,
+	colors:["#FFFFFF",colors.LOCKDOWN,colors.SUPPRESSION,colors.ACID,colors.HEAL,"#FFFFFF","#FFFFFF",colors.ICE,"#FFFFFF"],
+	names:["None","Lockdown","Suppression","Acid","Heal","Lockdown resistance","Suppression resistance","Ice","Ice resistance"],
+	opposite:[-1,5,6,-1,-1,-1,-1,8,-1],
+	have_times:[0,400,600,300,251,400,700,400,700],
+	been_times:[0,200,400,100,0,0,0,300,0],
+	can_pack:[0,1,1,1,1,0,0,1,0],
+	can_fire:[0,1,1,1,0,0,0,1,0],
 	NONE:0,
 	LOCKDOWN:1,
 	SUPPRESSION:2,
 	ACID:3,
 	HEAL:4,
 	LOCKDOWN_RESISTANCE:5,
-	SUPPRESSION_RESISTANCE:6
+	SUPPRESSION_RESISTANCE:6,
+	ICE:7,
+	ICE_RESISTANCE:8
 };
 
 var weapons = {
@@ -352,16 +358,16 @@ function Player() {
 
 	this.left = () => {
 		if (!this.count_been_effect(effects.LOCKDOWN)) {
-			this.xaa = 0.1;
-			this.xa = -5;
+			this.xaa = 0.1*(this.count_been_effect(effects.ICE)?0.5:1);
+			this.xa = -5*(this.count_been_effect(effects.ICE)?0.5:1);
 		}
 		this.d = -1;
 	};
 
 	this.right = () => {
 		if (!this.count_been_effect(effects.LOCKDOWN)) {
-			this.xaa = -.1;
-			this.xa = 5;
+			this.xaa = -.1*(this.count_been_effect(effects.ICE)?0.5:1);
+			this.xa = 5*(this.count_been_effect(effects.ICE)?0.5:1);
 		}
 		this.d = 1;
 	};
@@ -380,17 +386,13 @@ function Player() {
 			this.fire_cnt += 1;
 		}
 		let ef = new Array();
-		if (this.count_have_effect(effects.LOCKDOWN)){
-			ef.push(new Effect(effects.LOCKDOWN,effects.been_times[effects.LOCKDOWN]));
-		}
-		if (this.count_have_effect(effects.SUPPRESSION)){
-			ef.push(new Effect(effects.SUPPRESSION,effects.been_times[effects.SUPPRESSION]));
-		}
-		if (this.count_have_effect(effects.ACID)){
-			ef.push(new Effect(effects.ACID,effects.been_times[effects.ACID]));
+		for(let i = 0; i < effects.count; i+=1){
+			if(this.count_have_effect(i)&&effects.can_fire[i]){
+				ef.push(new Effect(i,effects.have_times[i]));
+			}
 		}
 		for(let i = 0; i < weapons.bulletspertime[this.weapon] ; i+=1) {
-			this.bullets.push(new Bullet(this.x + (this.d-1)*weapons.len[this.weapon]/2 , this.y + 3, this.d, ef, this.fire_cnt, this.weapon, this.count_been_effect(effects.SUPPRESSION)));
+			this.bullets.push(new Bullet(this.x, this.y + 3, this.d, ef, this.fire_cnt, this.weapon, this.count_been_effect(effects.SUPPRESSION)));
 		}
 		this.xaa = this.d * .01;
 		this.xa = -this.d * 1;
@@ -567,6 +569,9 @@ function Player() {
 	}
 
 	this.been_attacked = (dmg) => {
+		if(this.count_been_effect(effects.ICE)){
+			dmg *= 1.5;
+		}
 		this.blood -= dmg;
 		this.blood_limit -= dmg/2;
 	}
@@ -817,7 +822,10 @@ function generatepack() {
 	if(Math.random()<=1/500) {
 		let posx,posy;
 		let e=get_random(0,lands.length-1);
-		let ef=get_random(1,4);
+		let ef=0;
+		while(!effects.can_pack[ef]){
+			ef=get_random(1,effects.count);
+		}
 		effectpacks.push(new Effect_pack(lands[e].x+get_random(20,lands[e].len-20),lands[e].y-10,ef));
 	}
 	// if(Math.random()<=1/500) {
@@ -849,7 +857,9 @@ function delpacks() {
 
 function draweffects(x,y,p,ty) {
 	let vis=new Array();
-	vis.push(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+	for(let i=0;i<=effects.count;i++){
+　　	vis.push(0);
+　　}
 	cvs.font="20px Consolas";
 	y = y + 30;
 	for (let i in p.have_effects) {
