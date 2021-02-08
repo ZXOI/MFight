@@ -42,6 +42,12 @@ If you pick it, you will have a good effect named Suppression for 600 ticks. In 
 If you got a shot with Suppression, you will have a bad effect called Suppression for 400 ticks. In this peroid of time, the damage cause by your bullet will be half;     
 You will also get a good effect called Suppression_resistance for 700 ticks.In this peroid of time, you won't get Suppression(bad) for a second time.
 
+#### ICE
+The packet of it is colored with lightblue.  
+If you pick it, you will have a good effect named Ice for 400 ticks. In this peroid of time, every shot comes from you will have Ice effect;  
+If you got a shot with Ice, you will have a bad effect called Ice for 300 ticks. In this peroid of time, the damage cause by your enemy's bullet will be increased by half;     
+You will also get a good effect called Ice_resistance for 700 ticks.In this peroid of time, you won't get Ice(bad) for a second time.
+
 #### Heal
 The packet of it is colored with freshgreen.
 If you pick it, you will have a good effect named Heal for 300 ticks. In this peroid of time, your health will increase at the speed of 1/2 per tick;  
