@@ -65,6 +65,3 @@ If you pick it:
 
 If your shield is not at the health of 30, the health of it will increase slowly at the speed of 1 per second.  
 If your shield has been damaged to 0 health, you will lose it.
-
-test
-<a style="color : red">a</a>
